@@ -36,16 +36,21 @@ if unset.
 npm run adduser
 ```
 
-This prompts for a username and password and stores a bcrypt-hashed credential in
-`users.json` at the repo root (created automatically on first run). There's no
-signup page — every account is created this way, on the machine running the
-server. Run it again any time to add another user or overwrite an existing user's
-password.
+This prompts for a username, a password, and whether the account is an admin,
+then stores a bcrypt-hashed credential in `users.json` at the repo root (created
+automatically on first run). There's no signup page — every account is created
+this way, on the machine running the server. Run it again any time to add
+another user or overwrite an existing user's password/admin status.
 
 Usernames may only contain letters, numbers, hyphens, and underscores, since the
 username doubles as the upload folder name (see below).
 
 `users.json` is gitignored — it's per-deployment data, not part of the repo.
+
+Regular users land on the drag-and-drop upload page. Admin users skip that and
+land on `/admin` instead — a read-only page listing every user's uploaded files
+(name, size, upload date) with a download link for each. It has no delete or
+upload controls, and the admin API routes reject non-admin sessions.
 
 ## Run locally
 

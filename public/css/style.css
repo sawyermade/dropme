@@ -225,3 +225,39 @@ button:disabled {
   font-size: 0.9rem;
   color: var(--success);
 }
+
+/* Admin page */
+
+.admin {
+  max-width: 720px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.admin-user h2 {
+  font-size: 1rem;
+  margin: 0 0 0.6rem;
+  color: var(--text-dim);
+}
+
+.admin-user .file-list li {
+  gap: 1rem;
+}
+
+.admin-user .file-list span {
+  overflow-wrap: anywhere;
+}
+
+.download-link {
+  flex-shrink: 0;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.download-link:hover {
+  text-decoration: underline;
+}

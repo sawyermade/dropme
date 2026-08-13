@@ -34,10 +34,13 @@ rl.question('Username: ', (username) => {
       return;
     }
 
-    const users = loadUsers();
-    users[username] = bcrypt.hashSync(password, 10);
-    saveUsers(users);
-    console.log(`User "${username}" saved to ${USERS_FILE}`);
-    rl.close();
+    rl.question('Make this user an admin? (y/N): ', (answer) => {
+      const isAdmin = /^y(es)?$/i.test(answer.trim());
+      const users = loadUsers();
+      users[username] = { hash: bcrypt.hashSync(password, 10), isAdmin };
+      saveUsers(users);
+      console.log(`User "${username}" (${isAdmin ? 'admin' : 'regular'}) saved to ${USERS_FILE}`);
+      rl.close();
+    });
   });
 });
