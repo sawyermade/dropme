@@ -96,7 +96,7 @@ uploadBtn.addEventListener('click', () => {
   selectedFiles.forEach((file) => formData.append('files', file, file.name));
 
   const xhr = new XMLHttpRequest();
-  xhr.open('POST', '/api/upload');
+  xhr.open('POST', `${window.BASE_PATH}/api/upload`);
 
   uploadBtn.disabled = true;
   statusMsg.textContent = '';
@@ -117,7 +117,7 @@ uploadBtn.addEventListener('click', () => {
       selectedFiles = [];
       renderList();
     } else if (xhr.status === 401) {
-      window.location.href = '/login';
+      window.location.href = `${window.BASE_PATH}/login`;
     } else {
       statusMsg.textContent = 'Upload failed.';
       uploadBtn.disabled = false;
@@ -134,6 +134,6 @@ uploadBtn.addEventListener('click', () => {
 });
 
 logoutBtn.addEventListener('click', async () => {
-  await fetch('/api/logout', { method: 'POST' });
-  window.location.href = '/login';
+  await fetch(`${window.BASE_PATH}/api/logout`, { method: 'POST' });
+  window.location.href = `${window.BASE_PATH}/login`;
 });

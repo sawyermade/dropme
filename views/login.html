@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>DropMe — Login</title>
-  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="__BASE_PATH__/css/style.css">
 </head>
 <body class="auth-body">
   <main class="auth-card">
@@ -22,6 +22,7 @@
       <p class="error" id="login-error" hidden></p>
     </form>
   </main>
-  <script src="/js/login.js"></script>
+  <script>window.BASE_PATH = "__BASE_PATH__";</script>
+  <script src="__BASE_PATH__/js/login.js"></script>
 </body>
 </html>

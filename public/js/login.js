@@ -6,7 +6,7 @@ form.addEventListener('submit', async (e) => {
   errorEl.hidden = true;
 
   const data = new FormData(form);
-  const res = await fetch('/api/login', {
+  const res = await fetch(`${window.BASE_PATH}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -16,7 +16,7 @@ form.addEventListener('submit', async (e) => {
   });
 
   if (res.ok) {
-    window.location.href = '/';
+    window.location.href = `${window.BASE_PATH}/`;
     return;
   }
 
