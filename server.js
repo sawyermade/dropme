@@ -39,6 +39,19 @@ function renderPage(name) {
   return html.replace(/__BASE_PATH__/g, BASE_PATH);
 }
 
+function listFilesIn(dir) {
+  if (!fs.existsSync(dir)) return [];
+
+  return fs
+    .readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .map((entry) => {
+      const stat = fs.statSync(path.join(dir, entry.name));
+      return { name: entry.name, size: stat.size, mtime: stat.mtimeMs };
+    })
+    .sort((a, b) => b.mtime - a.mtime);
+}
+
 function listUploads() {
   if (!fs.existsSync(UPLOADS_DIR)) return [];
 
@@ -47,18 +60,10 @@ function listUploads() {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort()
-    .map((username) => {
-      const dir = path.join(UPLOADS_DIR, username);
-      const files = fs
-        .readdirSync(dir, { withFileTypes: true })
-        .filter((entry) => entry.isFile())
-        .map((entry) => {
-          const stat = fs.statSync(path.join(dir, entry.name));
-          return { name: entry.name, size: stat.size, mtime: stat.mtimeMs };
-        })
-        .sort((a, b) => b.mtime - a.mtime);
-      return { username, files };
-    });
+    .map((username) => ({
+      username,
+      files: listFilesIn(path.join(UPLOADS_DIR, username)),
+    }));
 }
 
 const app = express();
@@ -158,6 +163,22 @@ const upload = multer({ storage });
 router.post('/api/upload', requireAuthApi, upload.array('files'), (req, res) => {
   const names = (req.files || []).map((f) => f.filename);
   res.json({ ok: true, files: names });
+});
+
+router.get('/api/files', requireAuthApi, (req, res) => {
+  res.json({ files: listFilesIn(path.join(UPLOADS_DIR, req.session.user)) });
+});
+
+router.get('/api/download/:filename', requireAuthApi, (req, res) => {
+  // path.basename strips any directory components, so this can't escape the user's own upload dir.
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, req.session.user, filename);
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).send('Not found');
+  }
+
+  res.download(filePath, filename);
 });
 
 router.get('/api/admin/files', requireAuthApi, requireAdminApi, (req, res) => {

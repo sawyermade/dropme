@@ -9,6 +9,8 @@ const logoutBtn = document.getElementById('logout-btn');
 const progressWrap = document.getElementById('progress-wrap');
 const progressBar = document.getElementById('progress-bar');
 const statusMsg = document.getElementById('status-msg');
+const myFileListEl = document.getElementById('my-file-list');
+const myFilesEmpty = document.getElementById('my-files-empty');
 
 function addFiles(fileList) {
   for (const file of fileList) {
@@ -57,6 +59,38 @@ function renderList() {
   });
 
   uploadBtn.disabled = selectedFiles.length === 0;
+}
+
+function formatDate(ms) {
+  return new Date(ms).toLocaleString();
+}
+
+async function loadMyFiles() {
+  const res = await fetch(`${window.BASE_PATH}/api/files`);
+  if (res.status === 401) {
+    window.location.href = `${window.BASE_PATH}/login`;
+    return;
+  }
+
+  const { files } = await res.json();
+  myFileListEl.innerHTML = '';
+  myFilesEmpty.hidden = files.length > 0;
+
+  files.forEach((file) => {
+    const li = document.createElement('li');
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = `${file.name} (${formatSize(file.size)}, ${formatDate(file.mtime)})`;
+
+    const link = document.createElement('a');
+    link.className = 'download-link';
+    link.href = `${window.BASE_PATH}/api/download/${encodeURIComponent(file.name)}`;
+    link.textContent = 'Download';
+
+    li.appendChild(nameSpan);
+    li.appendChild(link);
+    myFileListEl.appendChild(li);
+  });
 }
 
 ['dragenter', 'dragover'].forEach((evt) =>
@@ -116,6 +150,7 @@ uploadBtn.addEventListener('click', () => {
       statusMsg.textContent = `Uploaded ${selectedFiles.length} file(s) successfully.`;
       selectedFiles = [];
       renderList();
+      loadMyFiles();
     } else if (xhr.status === 401) {
       window.location.href = `${window.BASE_PATH}/login`;
     } else {
@@ -137,3 +172,5 @@ logoutBtn.addEventListener('click', async () => {
   await fetch(`${window.BASE_PATH}/api/logout`, { method: 'POST' });
   window.location.href = `${window.BASE_PATH}/login`;
 });
+
+loadMyFiles();

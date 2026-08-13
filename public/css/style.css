@@ -237,17 +237,20 @@ button:disabled {
   gap: 1.5rem;
 }
 
-.admin-user h2 {
+.admin-user h2,
+.my-files h2 {
   font-size: 1rem;
   margin: 0 0 0.6rem;
   color: var(--text-dim);
 }
 
-.admin-user .file-list li {
+.admin-user .file-list li,
+.my-files .file-list li {
   gap: 1rem;
 }
 
-.admin-user .file-list span {
+.admin-user .file-list span,
+.my-files .file-list span {
   overflow-wrap: anywhere;
 }
 
