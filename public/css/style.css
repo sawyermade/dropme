@@ -279,9 +279,21 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
+.user-list-details summary {
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  padding: 0.4rem 0;
+}
+
+.user-list-details summary:hover {
+  color: var(--text);
+}
+
 .user-list {
   list-style: none;
-  margin: 0;
+  margin: 0.75rem 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;

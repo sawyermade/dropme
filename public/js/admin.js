@@ -2,6 +2,7 @@ const uploadsEl = document.getElementById('uploads-by-user');
 const emptyMsg = document.getElementById('empty-msg');
 const logoutBtn = document.getElementById('logout-btn');
 const userListEl = document.getElementById('user-list');
+const userListSummary = document.getElementById('user-list-summary');
 const addUserForm = document.getElementById('add-user-form');
 const addUserError = document.getElementById('add-user-error');
 
@@ -77,6 +78,7 @@ async function loadUsers() {
 
   const { users } = await res.json();
   userListEl.innerHTML = '';
+  userListSummary.textContent = `Users (${users.length})`;
 
   users.forEach(({ username, isAdmin }) => {
     const li = document.createElement('li');
