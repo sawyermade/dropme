@@ -62,8 +62,39 @@ async function loadUploads() {
       link.href = `${window.BASE_PATH}/api/admin/download/${encodeURIComponent(username)}/${encodeURIComponent(file.name)}`;
       link.textContent = 'Download';
 
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'delete-file-btn';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', async () => {
+        if (!confirm(`Delete "${file.name}" (uploaded by ${username})? This cannot be undone.`)) return;
+
+        const res = await fetch(
+          `${window.BASE_PATH}/api/admin/files/${encodeURIComponent(username)}/${encodeURIComponent(file.name)}`,
+          { method: 'DELETE' }
+        );
+
+        if (await handleAuthFailure(res)) return;
+
+        if (res.ok) {
+          li.remove();
+          if (list.children.length === 0) {
+            section.remove();
+            emptyMsg.hidden = uploadsEl.children.length > 0;
+          }
+        } else {
+          const json = await res.json().catch(() => ({}));
+          alert(json.error || 'Failed to delete file.');
+        }
+      });
+
+      const actions = document.createElement('div');
+      actions.className = 'file-actions';
+      actions.appendChild(link);
+      actions.appendChild(deleteBtn);
+
       li.appendChild(nameSpan);
-      li.appendChild(link);
+      li.appendChild(actions);
       list.appendChild(li);
     });
 

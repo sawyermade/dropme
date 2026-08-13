@@ -186,6 +186,19 @@ router.get('/api/download/:filename', requireAuthApi, (req, res) => {
   res.download(filePath, filename);
 });
 
+router.delete('/api/files/:filename', requireAuthApi, (req, res) => {
+  // path.basename strips any directory components, so this can't escape the user's own upload dir.
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, req.session.user, filename);
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  fs.unlinkSync(filePath);
+  res.json({ ok: true });
+});
+
 router.get('/api/admin/files', requireAuthApi, requireAdminApi, (req, res) => {
   res.json({ users: listUploads() });
 });
@@ -201,6 +214,20 @@ router.get('/api/admin/download/:username/:filename', requireAuthApi, requireAdm
   }
 
   res.download(filePath, filename);
+});
+
+router.delete('/api/admin/files/:username/:filename', requireAuthApi, requireAdminApi, (req, res) => {
+  // path.basename strips any directory components, so neither param can escape UPLOADS_DIR.
+  const username = path.basename(req.params.username);
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, username, filename);
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  fs.unlinkSync(filePath);
+  res.json({ ok: true });
 });
 
 router.get('/api/admin/users', requireAuthApi, requireAdminApi, (req, res) => {

@@ -87,8 +87,38 @@ async function loadMyFiles() {
     link.href = `${window.BASE_PATH}/api/download/${encodeURIComponent(file.name)}`;
     link.textContent = 'Download';
 
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'delete-file-btn';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Delete "${file.name}"? This cannot be undone.`)) return;
+
+      const res = await fetch(`${window.BASE_PATH}/api/files/${encodeURIComponent(file.name)}`, {
+        method: 'DELETE',
+      });
+
+      if (res.status === 401) {
+        window.location.href = `${window.BASE_PATH}/login`;
+        return;
+      }
+
+      if (res.ok) {
+        li.remove();
+        myFilesEmpty.hidden = myFileListEl.children.length > 0;
+      } else {
+        const json = await res.json().catch(() => ({}));
+        alert(json.error || 'Failed to delete file.');
+      }
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'file-actions';
+    actions.appendChild(link);
+    actions.appendChild(deleteBtn);
+
     li.appendChild(nameSpan);
-    li.appendChild(link);
+    li.appendChild(actions);
     myFileListEl.appendChild(li);
   });
 }
