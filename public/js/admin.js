@@ -404,10 +404,12 @@ async function loadUsers() {
 
     const passwordForm = document.createElement('form');
     passwordForm.className = 'password-form';
+    passwordForm.autocomplete = 'off';
 
     const passwordInput = document.createElement('input');
     passwordInput.type = 'password';
     passwordInput.placeholder = 'New password';
+    passwordInput.autocomplete = 'new-password'; // it's someone else's new password, not the admin's own login
     passwordInput.required = true;
 
     const setBtn = document.createElement('button');

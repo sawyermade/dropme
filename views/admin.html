@@ -42,15 +42,15 @@
     <section class="admin-users">
       <h2>Users</h2>
 
-      <form id="add-user-form" class="add-user-form">
+      <form id="add-user-form" class="add-user-form" autocomplete="off">
         <h3>Add user</h3>
         <label>
           Username
-          <input type="text" name="username" pattern="[a-zA-Z0-9_-]+" title="Letters, numbers, hyphens and underscores only" required>
+          <input type="text" name="username" pattern="[a-zA-Z0-9_-]+" title="Letters, numbers, hyphens and underscores only" autocomplete="off" required>
         </label>
         <label>
           Password
-          <input type="password" name="password" required>
+          <input type="password" name="password" autocomplete="new-password" required>
         </label>
         <label class="checkbox-label">
           <input type="checkbox" name="isAdmin">
