@@ -237,11 +237,20 @@ button:disabled {
   gap: 1.5rem;
 }
 
-.admin-user h2,
+.admin > section > h2 {
+  font-size: 1.1rem;
+  margin: 0 0 1rem;
+}
+
+.admin-user h3,
 .my-files h2 {
   font-size: 1rem;
   margin: 0 0 0.6rem;
   color: var(--text-dim);
+}
+
+.admin-user + .admin-user {
+  margin-top: 1.25rem;
 }
 
 .admin-user .file-list li,
@@ -263,4 +272,97 @@ button:disabled {
 
 .download-link:hover {
   text-decoration: underline;
+}
+
+.admin-users {
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.user-list {
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.user-name {
+  flex: 1;
+  min-width: 120px;
+  overflow-wrap: anywhere;
+}
+
+.password-form {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.password-form input {
+  padding: 0.4rem 0.6rem;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 0.85rem;
+  width: 140px;
+}
+
+.password-form button {
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.user-row-msg {
+  font-size: 0.8rem;
+  color: var(--success);
+}
+
+.user-row-msg.error {
+  color: var(--danger);
+}
+
+.delete-user-btn {
+  background: transparent;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+}
+
+.delete-user-btn:hover {
+  background: var(--danger);
+  color: white;
+}
+
+.add-user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 320px;
+}
+
+.add-user-form h3 {
+  font-size: 0.9rem;
+  margin: 0;
+  color: var(--text-dim);
+}
+
+.checkbox-label {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
 }

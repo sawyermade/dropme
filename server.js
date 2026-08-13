@@ -10,6 +10,7 @@ const bcrypt = require('bcryptjs');
 const PORT = process.env.PORT || 3000;
 const USERS_FILE = path.join(__dirname, 'users.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
+const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
 
 // e.g. BASE_PATH=/dropme when hosted at https://example.com/dropme instead of the domain root.
 // Normalized to have no trailing slash ('' means root).
@@ -21,6 +22,10 @@ const ADMIN_URL = `${BASE_PATH}/admin`;
 function loadUsers() {
   if (!fs.existsSync(USERS_FILE)) return {};
   return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
+}
+
+function saveUsers(users) {
+  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
 // Users predate the admin flag as plain "username": "bcryptHash" entries;
@@ -196,6 +201,71 @@ router.get('/api/admin/download/:username/:filename', requireAuthApi, requireAdm
   }
 
   res.download(filePath, filename);
+});
+
+router.get('/api/admin/users', requireAuthApi, requireAdminApi, (req, res) => {
+  const users = loadUsers();
+  const list = Object.keys(users)
+    .sort()
+    .map((username) => ({ username, isAdmin: getUserRecord(users, username).isAdmin }));
+  res.json({ users: list });
+});
+
+router.post('/api/admin/users', requireAuthApi, requireAdminApi, (req, res) => {
+  const { username, password, isAdmin } = req.body || {};
+
+  if (!username || !USERNAME_RE.test(username)) {
+    return res.status(400).json({ error: 'Username may only contain letters, numbers, hyphens and underscores.' });
+  }
+  if (!password) {
+    return res.status(400).json({ error: 'Password cannot be empty.' });
+  }
+
+  const users = loadUsers();
+  if (users[username]) {
+    return res.status(409).json({ error: 'That username already exists.' });
+  }
+
+  users[username] = { hash: bcrypt.hashSync(password, 10), isAdmin: !!isAdmin };
+  saveUsers(users);
+  res.json({ ok: true });
+});
+
+router.put('/api/admin/users/:username/password', requireAuthApi, requireAdminApi, (req, res) => {
+  const { username } = req.params;
+  const { password } = req.body || {};
+
+  if (!password) {
+    return res.status(400).json({ error: 'Password cannot be empty.' });
+  }
+
+  const users = loadUsers();
+  const record = getUserRecord(users, username);
+  if (!record) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  users[username] = { hash: bcrypt.hashSync(password, 10), isAdmin: record.isAdmin };
+  saveUsers(users);
+  res.json({ ok: true });
+});
+
+router.delete('/api/admin/users/:username', requireAuthApi, requireAdminApi, (req, res) => {
+  const { username } = req.params;
+
+  if (username === req.session.user) {
+    return res.status(400).json({ error: 'You cannot delete your own account.' });
+  }
+
+  const users = loadUsers();
+  if (!users[username]) {
+    return res.status(404).json({ error: 'User not found.' });
+  }
+
+  // Intentionally leave uploads/<username>/ on disk — only the login is removed.
+  delete users[username];
+  saveUsers(users);
+  res.json({ ok: true });
 });
 
 app.use(BASE_PATH || '/', router);

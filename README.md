@@ -30,27 +30,42 @@ openssl rand -hex 32
 Paste the output in as `SESSION_SECRET=...` in `.env`. `PORT` defaults to `3000`
 if unset.
 
-## Create users
+## Create the first admin user
+
+There's no signup page — the very first account has to be created from the
+command line, on the machine running the server:
 
 ```bash
 npm run adduser
 ```
 
-This prompts for a username, a password, and whether the account is an admin,
-then stores a bcrypt-hashed credential in `users.json` at the repo root (created
-automatically on first run). There's no signup page — every account is created
-this way, on the machine running the server. Run it again any time to add
-another user or overwrite an existing user's password/admin status.
+This prompts for a username, a password, and whether the account is an admin —
+answer **y** here for your first user. It stores a bcrypt-hashed credential in
+`users.json` at the repo root (created automatically on first run).
 
 Usernames may only contain letters, numbers, hyphens, and underscores, since the
 username doubles as the upload folder name (see below).
 
 `users.json` is gitignored — it's per-deployment data, not part of the repo.
 
+Once that admin account exists, log in as them and create everyone else from
+the `/admin` page in the browser instead — you shouldn't need to run
+`npm run adduser` again. It's still there as a fallback (e.g. if you get locked
+out and need to reset a password from the shell).
+
 Regular users land on the drag-and-drop upload page. Admin users skip that and
-land on `/admin` instead — a read-only page listing every user's uploaded files
-(name, size, upload date) with a download link for each. It has no delete or
-upload controls, and the admin API routes reject non-admin sessions.
+land on `/admin` instead, which has two things:
+
+- **Users** — every account, with a "Set password" field and a "Delete" button
+  per user, plus an "Add user" form (username, password, admin checkbox).
+  Deleting a user only removes their login — their `uploads/<username>/` folder
+  and everything in it is left alone. You can't delete the account you're
+  currently logged in as.
+- **Uploads** — a read-only listing of every user's uploaded files (name, size,
+  upload date) with a download link for each. There's no delete or upload
+  control here.
+
+All of the admin API routes reject non-admin sessions.
 
 ## Run locally
 
@@ -59,7 +74,9 @@ npm start
 ```
 
 Visit `http://localhost:3000`, log in, then drag & drop, paste, or browse to
-select files and hit Upload.
+select files and hit Upload. Below the upload box, a "Your files" list shows
+everything that user has uploaded so far, each with a download link — it
+refreshes automatically after every upload.
 
 ## Run on a remote server
 
@@ -76,7 +93,8 @@ select files and hit Upload.
    the default `3000`. If it's being hosted under an existing site instead of
    its own (sub)domain, also set `BASE_PATH` (see below).
 
-3. Create at least one user with `npm run adduser`.
+3. Create your first (admin) user with `npm run adduser` (see above — answer
+   **y** to the admin prompt). Everyone else can be added later from `/admin`.
 
 4. Keep the app running and auto-restarting with a process manager, e.g.
    [pm2](https://pm2.keymetrics.io/):
@@ -134,6 +152,11 @@ select files and hit Upload.
    Either way, only expose ports 80/443 on the server's firewall — leave the
    app's port (e.g. `3000`) closed to the outside world so it's only reachable
    through the proxy.
+
+   [`examples/nginx/example.com.conf`](examples/nginx/example.com.conf) has a
+   full working example of Option B — DropMe mounted at `/dropme` alongside an
+   existing static site on the same domain, with Certbot-managed TLS. Swap the
+   placeholder domain and paths for your own.
 
 ## Where files are stored
 

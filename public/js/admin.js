@@ -1,6 +1,9 @@
-const usersEl = document.getElementById('users');
+const uploadsEl = document.getElementById('uploads-by-user');
 const emptyMsg = document.getElementById('empty-msg');
 const logoutBtn = document.getElementById('logout-btn');
+const userListEl = document.getElementById('user-list');
+const addUserForm = document.getElementById('add-user-form');
+const addUserError = document.getElementById('add-user-error');
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -18,15 +21,20 @@ function formatDate(ms) {
   return new Date(ms).toLocaleString();
 }
 
-async function load() {
-  const res = await fetch(`${window.BASE_PATH}/api/admin/files`);
+async function handleAuthFailure(res) {
   if (res.status === 401 || res.status === 403) {
     window.location.href = `${window.BASE_PATH}/login`;
-    return;
+    return true;
   }
+  return false;
+}
+
+async function loadUploads() {
+  const res = await fetch(`${window.BASE_PATH}/api/admin/files`);
+  if (await handleAuthFailure(res)) return;
 
   const { users } = await res.json();
-  usersEl.innerHTML = '';
+  uploadsEl.innerHTML = '';
 
   const usersWithFiles = users.filter((u) => u.files.length > 0);
   emptyMsg.hidden = usersWithFiles.length > 0;
@@ -35,7 +43,7 @@ async function load() {
     const section = document.createElement('section');
     section.className = 'admin-user';
 
-    const heading = document.createElement('h2');
+    const heading = document.createElement('h3');
     heading.textContent = username;
     section.appendChild(heading);
 
@@ -59,13 +67,130 @@ async function load() {
     });
 
     section.appendChild(list);
-    usersEl.appendChild(section);
+    uploadsEl.appendChild(section);
   });
 }
+
+async function loadUsers() {
+  const res = await fetch(`${window.BASE_PATH}/api/admin/users`);
+  if (await handleAuthFailure(res)) return;
+
+  const { users } = await res.json();
+  userListEl.innerHTML = '';
+
+  users.forEach(({ username, isAdmin }) => {
+    const li = document.createElement('li');
+    li.className = 'user-row';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'user-name';
+    nameSpan.textContent = isAdmin ? `${username} (admin)` : username;
+
+    const passwordForm = document.createElement('form');
+    passwordForm.className = 'password-form';
+
+    const passwordInput = document.createElement('input');
+    passwordInput.type = 'password';
+    passwordInput.placeholder = 'New password';
+    passwordInput.required = true;
+
+    const setBtn = document.createElement('button');
+    setBtn.type = 'submit';
+    setBtn.textContent = 'Set password';
+
+    const rowMsg = document.createElement('span');
+    rowMsg.className = 'user-row-msg';
+
+    passwordForm.appendChild(passwordInput);
+    passwordForm.appendChild(setBtn);
+
+    passwordForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      rowMsg.textContent = '';
+      rowMsg.classList.remove('error');
+
+      const res = await fetch(
+        `${window.BASE_PATH}/api/admin/users/${encodeURIComponent(username)}/password`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: passwordInput.value }),
+        }
+      );
+
+      if (await handleAuthFailure(res)) return;
+
+      if (res.ok) {
+        passwordInput.value = '';
+        rowMsg.textContent = 'Password updated.';
+      } else {
+        const json = await res.json().catch(() => ({}));
+        rowMsg.textContent = json.error || 'Failed to update password.';
+        rowMsg.classList.add('error');
+      }
+    });
+
+    const deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'delete-user-btn';
+    deleteBtn.textContent = 'Delete';
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm(`Delete user "${username}"? Their uploaded files will NOT be deleted.`)) return;
+
+      const res = await fetch(`${window.BASE_PATH}/api/admin/users/${encodeURIComponent(username)}`, {
+        method: 'DELETE',
+      });
+
+      if (await handleAuthFailure(res)) return;
+
+      if (res.ok) {
+        loadUsers();
+      } else {
+        const json = await res.json().catch(() => ({}));
+        alert(json.error || 'Failed to delete user.');
+      }
+    });
+
+    li.appendChild(nameSpan);
+    li.appendChild(passwordForm);
+    li.appendChild(rowMsg);
+    li.appendChild(deleteBtn);
+    userListEl.appendChild(li);
+  });
+}
+
+addUserForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  addUserError.hidden = true;
+
+  const data = new FormData(addUserForm);
+  const res = await fetch(`${window.BASE_PATH}/api/admin/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: data.get('username'),
+      password: data.get('password'),
+      isAdmin: data.get('isAdmin') === 'on',
+    }),
+  });
+
+  if (await handleAuthFailure(res)) return;
+
+  if (res.ok) {
+    addUserForm.reset();
+    loadUsers();
+    return;
+  }
+
+  const json = await res.json().catch(() => ({}));
+  addUserError.textContent = json.error || 'Failed to add user.';
+  addUserError.hidden = false;
+});
 
 logoutBtn.addEventListener('click', async () => {
   await fetch(`${window.BASE_PATH}/api/logout`, { method: 'POST' });
   window.location.href = `${window.BASE_PATH}/login`;
 });
 
-load();
+loadUploads();
+loadUsers();

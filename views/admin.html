@@ -12,8 +12,34 @@
     <button id="logout-btn" class="link-btn" type="button">Log out</button>
   </header>
   <main class="admin">
-    <p id="empty-msg" class="status-msg" hidden>No uploads yet.</p>
-    <div id="users"></div>
+    <section class="admin-users">
+      <h2>Users</h2>
+      <ul id="user-list" class="user-list"></ul>
+
+      <form id="add-user-form" class="add-user-form">
+        <h3>Add user</h3>
+        <label>
+          Username
+          <input type="text" name="username" pattern="[a-zA-Z0-9_-]+" title="Letters, numbers, hyphens and underscores only" required>
+        </label>
+        <label>
+          Password
+          <input type="password" name="password" required>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="isAdmin">
+          Admin
+        </label>
+        <button type="submit">Add user</button>
+        <p class="error" id="add-user-error" hidden></p>
+      </form>
+    </section>
+
+    <section class="admin-uploads">
+      <h2>Uploads</h2>
+      <p id="empty-msg" class="status-msg" hidden>No uploads yet.</p>
+      <div id="uploads-by-user"></div>
+    </section>
   </main>
   <script>window.BASE_PATH = "__BASE_PATH__";</script>
   <script src="__BASE_PATH__/js/admin.js"></script>
