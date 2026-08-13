@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DropMe</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>DropMe</h1>
+    <button id="logout-btn" class="link-btn" type="button">Log out</button>
+  </header>
+  <main class="app">
+    <div id="dropzone" class="dropzone">
+      <p>Drag &amp; drop files here, paste, or</p>
+      <button id="browse-btn" class="browse-btn" type="button">Browse files</button>
+      <input id="file-input" type="file" multiple hidden>
+    </div>
+
+    <ul id="file-list" class="file-list"></ul>
+
+    <div class="actions">
+      <button id="upload-btn" type="button" disabled>Upload</button>
+      <div id="progress-wrap" class="progress-wrap" hidden>
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+      <p id="status-msg" class="status-msg"></p>
+    </div>
+  </main>
+  <script src="/js/app.js"></script>
+</body>
+</html>
