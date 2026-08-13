@@ -1,10 +1,22 @@
 const uploadsEl = document.getElementById('uploads-by-user');
+const uploadsSummary = document.getElementById('uploads-summary');
 const emptyMsg = document.getElementById('empty-msg');
 const logoutBtn = document.getElementById('logout-btn');
 const userListEl = document.getElementById('user-list');
 const userListSummary = document.getElementById('user-list-summary');
 const addUserForm = document.getElementById('add-user-form');
 const addUserError = document.getElementById('add-user-error');
+
+let selectedFiles = [];
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const browseBtn = document.getElementById('browse-btn');
+const fileListEl = document.getElementById('file-list');
+const uploadBtn = document.getElementById('upload-btn');
+const progressWrap = document.getElementById('progress-wrap');
+const progressBar = document.getElementById('progress-bar');
+const statusMsg = document.getElementById('status-msg');
 
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -30,6 +42,123 @@ async function handleAuthFailure(res) {
   return false;
 }
 
+function addFiles(fileList) {
+  for (const file of fileList) {
+    const alreadyAdded = selectedFiles.some(
+      (f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified
+    );
+    if (!alreadyAdded) selectedFiles.push(file);
+  }
+  renderSelectedFiles();
+}
+
+function removeSelectedFile(index) {
+  selectedFiles.splice(index, 1);
+  renderSelectedFiles();
+}
+
+function renderSelectedFiles() {
+  fileListEl.innerHTML = '';
+  selectedFiles.forEach((file, index) => {
+    const li = document.createElement('li');
+
+    const nameSpan = document.createElement('span');
+    nameSpan.textContent = `${file.name} (${formatSize(file.size)})`;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = '✕';
+    removeBtn.addEventListener('click', () => removeSelectedFile(index));
+
+    li.appendChild(nameSpan);
+    li.appendChild(removeBtn);
+    fileListEl.appendChild(li);
+  });
+
+  uploadBtn.disabled = selectedFiles.length === 0;
+}
+
+['dragenter', 'dragover'].forEach((evt) =>
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  })
+);
+
+['dragleave', 'drop'].forEach((evt) =>
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+  })
+);
+
+dropzone.addEventListener('drop', (e) => {
+  if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files);
+});
+
+browseBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files.length) addFiles(fileInput.files);
+  fileInput.value = '';
+});
+
+document.addEventListener('paste', (e) => {
+  const files = e.clipboardData?.files;
+  if (files?.length) addFiles(files);
+});
+
+uploadBtn.addEventListener('click', () => {
+  if (!selectedFiles.length) return;
+
+  const formData = new FormData();
+  selectedFiles.forEach((file) => formData.append('files', file, file.name));
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `${window.BASE_PATH}/api/upload`);
+
+  uploadBtn.disabled = true;
+  statusMsg.textContent = '';
+  progressWrap.hidden = false;
+  progressBar.style.width = '0%';
+
+  xhr.upload.addEventListener('progress', (e) => {
+    if (e.lengthComputable) {
+      progressBar.style.width = `${Math.round((e.loaded / e.total) * 100)}%`;
+    }
+  });
+
+  xhr.addEventListener('load', () => {
+    progressWrap.hidden = true;
+
+    if (xhr.status >= 200 && xhr.status < 300) {
+      statusMsg.textContent = `Uploaded ${selectedFiles.length} file(s) successfully.`;
+      selectedFiles = [];
+      renderSelectedFiles();
+      loadUploads();
+    } else if (xhr.status === 401) {
+      window.location.href = `${window.BASE_PATH}/login`;
+    } else {
+      statusMsg.textContent = 'Upload failed.';
+      uploadBtn.disabled = false;
+    }
+  });
+
+  xhr.addEventListener('error', () => {
+    progressWrap.hidden = true;
+    statusMsg.textContent = 'Upload failed.';
+    uploadBtn.disabled = false;
+  });
+
+  xhr.send(formData);
+});
+
+function updateUploadsSummary() {
+  const fileCount = uploadsEl.querySelectorAll('.file-list li').length;
+  uploadsSummary.textContent = `Uploads (${fileCount})`;
+}
+
 async function loadUploads() {
   const res = await fetch(`${window.BASE_PATH}/api/admin/files`);
   if (await handleAuthFailure(res)) return;
@@ -44,9 +173,12 @@ async function loadUploads() {
     const section = document.createElement('section');
     section.className = 'admin-user';
 
-    const heading = document.createElement('h3');
-    heading.textContent = username;
-    section.appendChild(heading);
+    const details = document.createElement('details');
+    details.className = 'admin-user-details';
+
+    const summary = document.createElement('summary');
+    summary.textContent = `${username} (${files.length})`;
+    details.appendChild(summary);
 
     const list = document.createElement('ul');
     list.className = 'file-list';
@@ -81,7 +213,10 @@ async function loadUploads() {
           if (list.children.length === 0) {
             section.remove();
             emptyMsg.hidden = uploadsEl.children.length > 0;
+          } else {
+            summary.textContent = `${username} (${list.children.length})`;
           }
+          updateUploadsSummary();
         } else {
           const json = await res.json().catch(() => ({}));
           alert(json.error || 'Failed to delete file.');
@@ -98,9 +233,12 @@ async function loadUploads() {
       list.appendChild(li);
     });
 
-    section.appendChild(list);
+    details.appendChild(list);
+    section.appendChild(details);
     uploadsEl.appendChild(section);
   });
+
+  updateUploadsSummary();
 }
 
 async function loadUsers() {

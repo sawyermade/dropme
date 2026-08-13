@@ -158,6 +158,22 @@ refreshes automatically after every upload.
    existing static site on the same domain, with Certbot-managed TLS. Swap the
    placeholder domain and paths for your own.
 
+## Deploying updates
+
+Once it's running on the server under pm2 (as `dropme`, per the setup above),
+pulling and applying code updates is:
+
+```bash
+cd /path/to/dropme
+git pull
+npm install
+pm2 restart dropme
+```
+
+`npm install` is a no-op if dependencies haven't changed, but safe to run every
+time. `.env`, `users.json`, and `uploads/` aren't touched by any of this — they
+live outside git entirely (see below).
+
 ## Where files are stored
 
 Uploads land in `uploads/<username>/`, where `<username>` is whoever is logged

@@ -8,10 +8,28 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>DropMe — Admin</h1>
+    <h1>DropMe — Admin: __USERNAME__</h1>
     <button id="logout-btn" class="link-btn" type="button">Log out</button>
   </header>
   <main class="admin">
+    <section class="admin-upload">
+      <div id="dropzone" class="dropzone">
+        <p>Drag &amp; drop files here, paste, or</p>
+        <button id="browse-btn" class="browse-btn" type="button">Browse files</button>
+        <input id="file-input" type="file" multiple hidden>
+      </div>
+
+      <ul id="file-list" class="file-list"></ul>
+
+      <div class="actions">
+        <button id="upload-btn" type="button" disabled>Upload</button>
+        <div id="progress-wrap" class="progress-wrap" hidden>
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+        <p id="status-msg" class="status-msg"></p>
+      </div>
+    </section>
+
     <section class="admin-users">
       <h2>Users</h2>
 
@@ -42,7 +60,10 @@
     <section class="admin-uploads">
       <h2>Uploads</h2>
       <p id="empty-msg" class="status-msg" hidden>No uploads yet.</p>
-      <div id="uploads-by-user"></div>
+      <details id="uploads-details" class="uploads-details">
+        <summary id="uploads-summary">Uploads</summary>
+        <div id="uploads-by-user"></div>
+      </details>
     </section>
   </main>
   <script>window.BASE_PATH = "__BASE_PATH__";</script>

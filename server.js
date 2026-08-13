@@ -37,11 +37,16 @@ function getUserRecord(users, username) {
   return { hash: raw.hash, isAdmin: !!raw.isAdmin };
 }
 
-// Injects BASE_PATH into the HTML shell so asset links, fetch calls, and
-// redirects generated client-side resolve correctly under a path prefix.
-function renderPage(name) {
-  const html = fs.readFileSync(path.join(__dirname, 'views', name), 'utf8');
-  return html.replace(/__BASE_PATH__/g, BASE_PATH);
+// Injects BASE_PATH (and any extra __VAR__ placeholders) into the HTML shell
+// so asset links, fetch calls, and redirects generated client-side resolve
+// correctly under a path prefix.
+function renderPage(name, vars = {}) {
+  let html = fs.readFileSync(path.join(__dirname, 'views', name), 'utf8');
+  html = html.replace(/__BASE_PATH__/g, BASE_PATH);
+  for (const [key, value] of Object.entries(vars)) {
+    html = html.replaceAll(`__${key}__`, value);
+  }
+  return html;
 }
 
 function listFilesIn(dir) {
@@ -123,7 +128,7 @@ router.get('/', requireAuthPage, (req, res) => {
 });
 
 router.get('/admin', requireAuthPage, requireAdminPage, (req, res) => {
-  res.type('html').send(renderPage('admin.html'));
+  res.type('html').send(renderPage('admin.html', { USERNAME: req.session.user }));
 });
 
 router.get('/api/me', (req, res) => {

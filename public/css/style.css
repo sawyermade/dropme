@@ -242,11 +242,23 @@ button:disabled {
   margin: 0 0 1rem;
 }
 
-.admin-user h3,
+.admin-user-details summary,
 .my-files h2 {
   font-size: 1rem;
   margin: 0 0 0.6rem;
   color: var(--text-dim);
+}
+
+.admin-user-details summary {
+  cursor: pointer;
+}
+
+.admin-user-details summary:hover {
+  color: var(--text);
+}
+
+.admin-user-details[open] summary {
+  margin-bottom: 0.6rem;
 }
 
 .admin-user + .admin-user {
@@ -298,7 +310,8 @@ button:disabled {
   border-bottom: 1px solid var(--border);
 }
 
-.user-list-details summary {
+.user-list-details summary,
+.uploads-details summary {
   cursor: pointer;
   font-size: 0.9rem;
   font-weight: 600;
@@ -306,8 +319,13 @@ button:disabled {
   padding: 0.4rem 0;
 }
 
-.user-list-details summary:hover {
+.user-list-details summary:hover,
+.uploads-details summary:hover {
   color: var(--text);
+}
+
+.uploads-details[open] > #uploads-by-user {
+  margin-top: 0.5rem;
 }
 
 .user-list {
