@@ -220,7 +220,7 @@ router.get('/login', (req, res) => {
 // Regular users land on the upload page; admins are bounced to /admin instead.
 router.get('/', requireAuthPage, (req, res) => {
   if (req.session.isAdmin) return res.redirect(ADMIN_URL);
-  res.type('html').send(renderPage('app.html'));
+  res.type('html').send(renderPage('app.html', { USERNAME: req.session.user }));
 });
 
 router.get('/admin', requireAuthPage, requireAdminPage, (req, res) => {

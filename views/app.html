@@ -1,11 +1,12 @@
 <!doctype html>
 <!--
-  Regular user's drop page. Served by server.js via renderPage('app.html'),
-  which does a plain string-replace of __BASE_PATH__ before sending this file
-  — that's why it appears in the stylesheet link and script tags below
-  instead of a templating engine. The share modal markup near the bottom is
-  intentionally duplicated (rather than shared/included) in admin.html; see
-  public/js/app.js for the drag/drop/upload/share logic.
+  Regular user's drop page. Served by server.js via renderPage('app.html',
+  { USERNAME }), which does a plain string-replace of __BASE_PATH__ and
+  __USERNAME__ before sending this file — that's why they appear in the
+  heading, stylesheet link, and script tags below instead of a templating
+  engine. The share modal markup near the bottom is intentionally duplicated
+  (rather than shared/included) in admin.html; see public/js/app.js for the
+  drag/drop/upload/share logic.
 -->
 <html lang="en">
 <head>
@@ -16,7 +17,7 @@
 </head>
 <body>
   <header class="topbar">
-    <h1>DropMe</h1>
+    <h1>DropMe — __USERNAME__</h1>
     <button id="logout-btn" class="link-btn" type="button">Log out</button>
   </header>
   <main class="app">
