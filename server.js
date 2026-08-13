@@ -1,3 +1,9 @@
+// DropMe server: session-based login, per-user file uploads, an admin panel
+// for managing users and everyone's files, and public share links.
+//
+// Everything is stored as flat JSON files next to this one (users.json,
+// shares.json) plus a per-user folder under uploads/ — no database.
+
 require('dotenv').config();
 
 const express = require('express');
@@ -20,6 +26,10 @@ const BASE_PATH = (process.env.BASE_PATH || '').replace(/\/+$/, '');
 const ROOT_URL = `${BASE_PATH}/`;
 const LOGIN_URL = `${BASE_PATH}/login`;
 const ADMIN_URL = `${BASE_PATH}/admin`;
+
+// ---------------------------------------------------------------------------
+// Users (users.json): { "username": { hash, isAdmin } }, all keys lowercase.
+// ---------------------------------------------------------------------------
 
 function loadUsers() {
   if (!fs.existsSync(USERS_FILE)) return {};
@@ -44,6 +54,15 @@ function getUserRecord(users, username) {
   return { hash: raw.hash, isAdmin: !!raw.isAdmin };
 }
 
+// ---------------------------------------------------------------------------
+// Public share links (shares.json): { "<random token>": { username, filename } }
+//
+// A file has at most one active token at a time. Anyone with the token can
+// download the file at GET /s/:token with no login (see that route below).
+// Turning a share off deletes its token entry, so the old URL immediately
+// starts 404ing — there's no separate "disabled" state to track.
+// ---------------------------------------------------------------------------
+
 function loadShares() {
   if (!fs.existsSync(SHARES_FILE)) return {};
   return JSON.parse(fs.readFileSync(SHARES_FILE, 'utf8'));
@@ -53,6 +72,9 @@ function saveShares(shares) {
   fs.writeFileSync(SHARES_FILE, JSON.stringify(shares, null, 2));
 }
 
+// Shares are keyed by token, but the app usually needs the reverse lookup —
+// "does this (username, filename) already have an active share?" — so it can
+// show the right on/off state in the UI without minting duplicate tokens.
 function findShareToken(shares, username, filename) {
   return (
     Object.keys(shares).find(
@@ -70,7 +92,7 @@ function getOrCreateShareToken(username, filename) {
   let token;
   do {
     token = crypto.randomBytes(24).toString('hex');
-  } while (shares[token]);
+  } while (shares[token]); // guard against the astronomically unlikely collision
 
   shares[token] = { username, filename };
   saveShares(shares);
@@ -87,6 +109,10 @@ function revokeShare(username, filename) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// HTML rendering and file listing helpers
+// ---------------------------------------------------------------------------
+
 // Injects BASE_PATH (and any extra __VAR__ placeholders) into the HTML shell
 // so asset links, fetch calls, and redirects generated client-side resolve
 // correctly under a path prefix.
@@ -99,6 +125,8 @@ function renderPage(name, vars = {}) {
   return html;
 }
 
+// Metadata (name/size/last-modified) for every file directly inside dir,
+// newest first. Used for both a user's own file list and the admin listing.
 function listFilesIn(dir) {
   if (!fs.existsSync(dir)) return [];
 
@@ -112,6 +140,7 @@ function listFilesIn(dir) {
     .sort((a, b) => b.mtime - a.mtime);
 }
 
+// The admin's full view: every uploads/<username>/ folder paired with its files.
 function listUploads() {
   if (!fs.existsSync(UPLOADS_DIR)) return [];
 
@@ -126,11 +155,19 @@ function listUploads() {
     }));
 }
 
+// ---------------------------------------------------------------------------
+// App setup
+// ---------------------------------------------------------------------------
+
 const app = express();
-app.set('trust proxy', 1);
+app.set('trust proxy', 1); // sits behind an nginx reverse proxy in production
 
 app.use(express.json());
 
+// All routes are mounted on this router instead of `app` directly, so the
+// whole thing (static assets, session cookie, every route) can be shifted
+// onto BASE_PATH in one place — see `app.use(BASE_PATH || '/', router)` at
+// the bottom of this file.
 const router = express.Router();
 
 router.use(express.static(path.join(__dirname, 'public')));
@@ -142,10 +179,14 @@ router.use(session({
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
-    path: BASE_PATH || '/',
+    path: BASE_PATH || '/', // scope the cookie to this app if it shares a domain with other sites
     maxAge: 1000 * 60 * 60 * 24 * 7,
   },
 }));
+
+// ---------------------------------------------------------------------------
+// Route guards
+// ---------------------------------------------------------------------------
 
 function requireAuthPage(req, res, next) {
   if (req.session.user) return next();
@@ -167,11 +208,16 @@ function requireAdminApi(req, res, next) {
   res.status(403).json({ error: 'Forbidden' });
 }
 
+// ---------------------------------------------------------------------------
+// Pages
+// ---------------------------------------------------------------------------
+
 router.get('/login', (req, res) => {
   if (req.session.user) return res.redirect(ROOT_URL);
   res.type('html').send(renderPage('login.html'));
 });
 
+// Regular users land on the upload page; admins are bounced to /admin instead.
 router.get('/', requireAuthPage, (req, res) => {
   if (req.session.isAdmin) return res.redirect(ADMIN_URL);
   res.type('html').send(renderPage('app.html'));
@@ -194,6 +240,10 @@ router.get('/s/:token', (req, res) => {
 
   res.download(filePath, entry.filename);
 });
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
 
 router.get('/api/me', (req, res) => {
   res.json({ user: req.session.user || null, isAdmin: !!req.session.isAdmin });
@@ -221,14 +271,21 @@ router.post('/api/logout', (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
+// ---------------------------------------------------------------------------
+// Uploading, and a user's own files (list/download/delete/share)
+// ---------------------------------------------------------------------------
+
 const storage = multer.diskStorage({
   destination(req, file, cb) {
+    // Every upload lands in the logged-in user's own folder — created on first use.
     const userDir = path.join(UPLOADS_DIR, req.session.user);
     fs.mkdirSync(userDir, { recursive: true });
     cb(null, userDir);
   },
   filename(req, file, cb) {
     // Strip any directory components so a crafted filename can't escape the user's upload dir.
+    // Keeping the original name (rather than renaming) means re-uploading the
+    // same filename overwrites the existing file, which is intentional.
     cb(null, path.basename(file.originalname));
   },
 });
@@ -265,11 +322,14 @@ router.delete('/api/files/:filename', requireAuthApi, (req, res) => {
     return res.status(404).json({ error: 'Not found' });
   }
 
+  // Revoke any public share before removing the file, so a share link can
+  // never briefly point at a deleted (or, worse, later reused) filename.
   revokeShare(req.session.user, filename);
   fs.unlinkSync(filePath);
   res.json({ ok: true });
 });
 
+// Current share status for one of the logged-in user's own files.
 router.get('/api/share/:filename', requireAuthApi, (req, res) => {
   const filename = path.basename(req.params.filename);
   const filePath = path.join(UPLOADS_DIR, req.session.user, filename);
@@ -282,6 +342,7 @@ router.get('/api/share/:filename', requireAuthApi, (req, res) => {
   res.json({ token });
 });
 
+// Turn sharing on (idempotent — returns the existing token if already shared).
 router.post('/api/share/:filename', requireAuthApi, (req, res) => {
   const filename = path.basename(req.params.filename);
   const filePath = path.join(UPLOADS_DIR, req.session.user, filename);
@@ -293,11 +354,16 @@ router.post('/api/share/:filename', requireAuthApi, (req, res) => {
   res.json({ token: getOrCreateShareToken(req.session.user, filename) });
 });
 
+// Turn sharing off.
 router.delete('/api/share/:filename', requireAuthApi, (req, res) => {
   const filename = path.basename(req.params.filename);
   revokeShare(req.session.user, filename);
   res.json({ ok: true });
 });
+
+// ---------------------------------------------------------------------------
+// Admin: browse/download/delete/share ANY user's files
+// ---------------------------------------------------------------------------
 
 router.get('/api/admin/files', requireAuthApi, requireAdminApi, (req, res) => {
   res.json({ users: listUploads() });
@@ -362,6 +428,10 @@ router.delete('/api/admin/share/:username/:filename', requireAuthApi, requireAdm
   revokeShare(username, filename);
   res.json({ ok: true });
 });
+
+// ---------------------------------------------------------------------------
+// Admin: manage user accounts
+// ---------------------------------------------------------------------------
 
 router.get('/api/admin/users', requireAuthApi, requireAdminApi, (req, res) => {
   const users = loadUsers();
@@ -429,6 +499,7 @@ router.delete('/api/admin/users/:username', requireAuthApi, requireAdminApi, (re
   res.json({ ok: true });
 });
 
+// Mount everything above under BASE_PATH (or at the root if it's unset).
 app.use(BASE_PATH || '/', router);
 
 app.listen(PORT, () => {

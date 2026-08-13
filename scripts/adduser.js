@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+// CLI for creating/resetting a DropMe login: `npm run adduser`.
+//
+// There's no signup page, so this script is the only way to create the very
+// first (admin) account. After that exists, everyday user management should
+// happen from the admin page in the browser — this script is mainly a
+// fallback for bootstrapping or recovering from a lockout.
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -39,6 +45,8 @@ rl.question('Username: ', (rawUsername) => {
 
     rl.question('Make this user an admin? (y/N): ', (answer) => {
       const isAdmin = /^y(es)?$/i.test(answer.trim());
+      // Re-running this for a username that already exists overwrites its
+      // password/admin flag in place — that's the supported way to reset one.
       const users = loadUsers();
       users[username] = { hash: bcrypt.hashSync(password, 10), isAdmin };
       saveUsers(users);

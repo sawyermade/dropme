@@ -1,3 +1,13 @@
+// Client-side logic for the admin page (views/admin.html): the same
+// drag/drop/paste/browse upload box as the regular user page (uploads land
+// in the admin's own folder), a read-only listing of every user's uploaded
+// files with share/delete controls, and full user management (add, change
+// password, delete).
+//
+// window.BASE_PATH is injected server-side (see renderPage in server.js) so
+// every fetch/link/redirect here still resolves correctly if the app is
+// hosted under a path prefix instead of a domain root.
+
 const uploadsEl = document.getElementById('uploads-by-user');
 const uploadsSummary = document.getElementById('uploads-summary');
 const emptyMsg = document.getElementById('empty-msg');
@@ -7,6 +17,7 @@ const userListSummary = document.getElementById('user-list-summary');
 const addUserForm = document.getElementById('add-user-form');
 const addUserError = document.getElementById('add-user-error');
 
+// Files the admin has picked but not yet uploaded (cleared once the upload succeeds).
 let selectedFiles = [];
 
 const dropzone = document.getElementById('dropzone');
@@ -18,6 +29,11 @@ const progressWrap = document.getElementById('progress-wrap');
 const progressBar = document.getElementById('progress-bar');
 const statusMsg = document.getElementById('status-msg');
 
+// --- Share modal --------------------------------------------------------
+// One modal, reused for whichever file's Share button was last clicked.
+// Unlike the user page, the admin can share ANY user's file, so the modal
+// needs to remember which user the current file belongs to as well.
+
 const shareModal = document.getElementById('share-modal');
 const shareModalTitle = document.getElementById('share-modal-title');
 const shareModalClose = document.getElementById('share-modal-close');
@@ -27,6 +43,7 @@ const shareUrlInput = document.getElementById('share-url-input');
 const shareCopyBtn = document.getElementById('share-copy-btn');
 const shareCopiedMsg = document.getElementById('share-copied-msg');
 
+// { username, filename } for the file the currently-open modal is for (null when closed).
 let shareContext = null;
 
 function buildShareUrl(token) {
@@ -37,13 +54,15 @@ function shareApiUrl(username, filename) {
   return `${window.BASE_PATH}/api/admin/share/${encodeURIComponent(username)}/${encodeURIComponent(filename)}`;
 }
 
+// Opens the modal for `username`'s `filename` and loads its current share
+// status from the server, since it may already be shared from a previous visit.
 function openShareModal(username, filename) {
   shareContext = { username, filename };
   shareModalTitle.textContent = `Share "${filename}"`;
   shareUrlRow.hidden = true;
   shareCopiedMsg.hidden = true;
   shareToggle.checked = false;
-  shareToggle.disabled = true;
+  shareToggle.disabled = true; // re-enabled once we know the real state, below
   shareModal.hidden = false;
 
   fetch(shareApiUrl(username, filename)).then(async (res) => {
@@ -65,10 +84,12 @@ function closeShareModal() {
 
 shareModalClose.addEventListener('click', closeShareModal);
 
+// Clicking the dimmed backdrop (not the modal card itself) also closes it.
 shareModal.addEventListener('click', (e) => {
   if (e.target === shareModal) closeShareModal();
 });
 
+// Flipping the toggle creates or revokes the share via the API, then shows/hides the URL.
 shareToggle.addEventListener('change', async () => {
   if (!shareContext) return;
   shareToggle.disabled = true;
@@ -105,6 +126,8 @@ shareCopyBtn.addEventListener('click', async () => {
   }, 1500);
 });
 
+// --- Small shared helpers ---------------------------------------------------
+
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   const units = ['KB', 'MB', 'GB', 'TB'];
@@ -121,6 +144,10 @@ function formatDate(ms) {
   return new Date(ms).toLocaleString();
 }
 
+// Every admin API route 401s if the session expired and 403s if it's not an
+// admin session (e.g. an admin got demoted in another tab) — either way,
+// bounce to the login page. Returns true if it redirected, so callers can
+// `if (await handleAuthFailure(res)) return;` and stop processing.
 async function handleAuthFailure(res) {
   if (res.status === 401 || res.status === 403) {
     window.location.href = `${window.BASE_PATH}/login`;
@@ -129,6 +156,10 @@ async function handleAuthFailure(res) {
   return false;
 }
 
+// --- Picking files to upload (identical flow to the user page) ------------
+
+// Adds newly picked files to the pending list, skipping ones already queued
+// (same name/size/last-modified — good enough to dedupe drag-drop + browse).
 function addFiles(fileList) {
   for (const file of fileList) {
     const alreadyAdded = selectedFiles.some(
@@ -144,6 +175,7 @@ function removeSelectedFile(index) {
   renderSelectedFiles();
 }
 
+// Renders the "about to upload" list and enables/disables the Upload button.
 function renderSelectedFiles() {
   fileListEl.innerHTML = '';
   selectedFiles.forEach((file, index) => {
@@ -188,20 +220,25 @@ browseBtn.addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', () => {
   if (fileInput.files.length) addFiles(fileInput.files);
-  fileInput.value = '';
+  fileInput.value = ''; // so picking the same file again still fires 'change'
 });
 
+// Anywhere-on-the-page paste, so the admin can Ctrl+V a copied file straight in.
 document.addEventListener('paste', (e) => {
   const files = e.clipboardData?.files;
   if (files?.length) addFiles(files);
 });
 
+// Uploads go through the same /api/upload route the regular user page uses,
+// so files the admin drops here land in their own uploads/<admin>/ folder
+// and then show up below in the Uploads listing like anyone else's.
 uploadBtn.addEventListener('click', () => {
   if (!selectedFiles.length) return;
 
   const formData = new FormData();
   selectedFiles.forEach((file) => formData.append('files', file, file.name));
 
+  // XMLHttpRequest (not fetch) so we can show real upload progress.
   const xhr = new XMLHttpRequest();
   xhr.open('POST', `${window.BASE_PATH}/api/upload`);
 
@@ -223,7 +260,7 @@ uploadBtn.addEventListener('click', () => {
       statusMsg.textContent = `Uploaded ${selectedFiles.length} file(s) successfully.`;
       selectedFiles = [];
       renderSelectedFiles();
-      loadUploads();
+      loadUploads(); // refresh the Uploads listing so the new file(s) appear immediately
     } else if (xhr.status === 401) {
       window.location.href = `${window.BASE_PATH}/login`;
     } else {
@@ -241,11 +278,18 @@ uploadBtn.addEventListener('click', () => {
   xhr.send(formData);
 });
 
+// --- Uploads listing (every user's files) ----------------------------------
+
+// Recomputes the "Uploads (N)" count from what's actually still in the DOM,
+// so it stays correct after files are deleted without needing a full reload.
 function updateUploadsSummary() {
   const fileCount = uploadsEl.querySelectorAll('.file-list li').length;
   uploadsSummary.textContent = `Uploads (${fileCount})`;
 }
 
+// Fetches and renders every user's uploaded files, grouped into a collapsed
+// <details> per user (also collapsed by default) with Download/Share/Delete
+// controls on each file. Called on load and again after any upload/delete.
 async function loadUploads() {
   const res = await fetch(`${window.BASE_PATH}/api/admin/files`);
   if (await handleAuthFailure(res)) return;
@@ -302,8 +346,10 @@ async function loadUploads() {
         if (await handleAuthFailure(res)) return;
 
         if (res.ok) {
+          // Remove it from the page immediately rather than reloading the whole list.
           li.remove();
           if (list.children.length === 0) {
+            // That was this user's last file — collapse their whole section away.
             section.remove();
             emptyMsg.hidden = uploadsEl.children.length > 0;
           } else {
@@ -335,6 +381,11 @@ async function loadUploads() {
   updateUploadsSummary();
 }
 
+// --- User management (add / change password / delete) ---------------------
+
+// Fetches and renders every account into the collapsed Users list, each row
+// with an inline "set password" form and a Delete button. Called on load and
+// again after adding, editing, or deleting a user.
 async function loadUsers() {
   const res = await fetch(`${window.BASE_PATH}/api/admin/users`);
   if (await handleAuthFailure(res)) return;
@@ -409,6 +460,8 @@ async function loadUsers() {
       if (await handleAuthFailure(res)) return;
 
       if (res.ok) {
+        // Simplest to just refetch — the server also rejects deleting yourself,
+        // so we don't need to special-case that here.
         loadUsers();
       } else {
         const json = await res.json().catch(() => ({}));

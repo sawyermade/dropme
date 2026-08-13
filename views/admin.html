@@ -1,4 +1,13 @@
 <!doctype html>
+<!--
+  Admin page. Served by server.js via renderPage('admin.html', { USERNAME }),
+  which does a plain string-replace of __BASE_PATH__ and __USERNAME__ before
+  sending this file — that's why they appear in the heading, stylesheet
+  link, and script tags below instead of a templating engine. The upload box
+  and share modal markup are intentionally duplicated (rather than
+  shared/included) from app.html; see public/js/admin.js for the
+  upload/listing/user-management/share logic.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">

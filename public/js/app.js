@@ -1,3 +1,13 @@
+// Client-side logic for the regular user's drop page (views/app.html):
+// picking files to upload (drag/drop, paste, or browse), uploading them with
+// a progress bar, listing the user's own previously-uploaded files, and the
+// share/delete controls on each of those files.
+//
+// window.BASE_PATH is injected server-side (see renderPage in server.js) so
+// every fetch/link/redirect here still resolves correctly if the app is
+// hosted under a path prefix instead of a domain root.
+
+// Files the user has picked but not yet uploaded (cleared once the upload succeeds).
 let selectedFiles = [];
 
 const dropzone = document.getElementById('dropzone');
@@ -12,6 +22,9 @@ const statusMsg = document.getElementById('status-msg');
 const myFileListEl = document.getElementById('my-file-list');
 const myFilesEmpty = document.getElementById('my-files-empty');
 
+// --- Share modal --------------------------------------------------------
+// One modal, reused for whichever file's Share button was last clicked.
+
 const shareModal = document.getElementById('share-modal');
 const shareModalTitle = document.getElementById('share-modal-title');
 const shareModalClose = document.getElementById('share-modal-close');
@@ -21,19 +34,22 @@ const shareUrlInput = document.getElementById('share-url-input');
 const shareCopyBtn = document.getElementById('share-copy-btn');
 const shareCopiedMsg = document.getElementById('share-copied-msg');
 
+// Which file the currently-open share modal is for (null when it's closed).
 let shareFilename = null;
 
 function buildShareUrl(token) {
   return `${window.location.origin}${window.BASE_PATH}/s/${token}`;
 }
 
+// Opens the modal for `filename` and loads its current share status from the
+// server, since a file may already be shared from a previous visit.
 function openShareModal(filename) {
   shareFilename = filename;
   shareModalTitle.textContent = `Share "${filename}"`;
   shareUrlRow.hidden = true;
   shareCopiedMsg.hidden = true;
   shareToggle.checked = false;
-  shareToggle.disabled = true;
+  shareToggle.disabled = true; // re-enabled once we know the real state, below
   shareModal.hidden = false;
 
   fetch(`${window.BASE_PATH}/api/share/${encodeURIComponent(filename)}`)
@@ -62,10 +78,12 @@ function closeShareModal() {
 
 shareModalClose.addEventListener('click', closeShareModal);
 
+// Clicking the dimmed backdrop (not the modal card itself) also closes it.
 shareModal.addEventListener('click', (e) => {
   if (e.target === shareModal) closeShareModal();
 });
 
+// Flipping the toggle creates or revokes the share via the API, then shows/hides the URL.
 shareToggle.addEventListener('change', async () => {
   if (!shareFilename) return;
   shareToggle.disabled = true;
@@ -105,6 +123,10 @@ shareCopyBtn.addEventListener('click', async () => {
   }, 1500);
 });
 
+// --- Picking files to upload ---------------------------------------------
+
+// Adds newly picked files to the pending list, skipping ones already queued
+// (same name/size/last-modified — good enough to dedupe drag-drop + browse).
 function addFiles(fileList) {
   for (const file of fileList) {
     const alreadyAdded = selectedFiles.some(
@@ -132,6 +154,7 @@ function formatSize(bytes) {
   return `${value.toFixed(1)} ${units[unitIndex]}`;
 }
 
+// Renders the "about to upload" list and enables/disables the Upload button.
 function renderList() {
   fileListEl.innerHTML = '';
   selectedFiles.forEach((file, index) => {
@@ -158,6 +181,11 @@ function formatDate(ms) {
   return new Date(ms).toLocaleString();
 }
 
+// --- "Your files" list (already-uploaded files) ---------------------------
+
+// Fetches and renders the user's own uploaded files, each with Download,
+// Share, and Delete controls. Called on page load and again after any
+// upload/delete so the list stays in sync without a full page refresh.
 async function loadMyFiles() {
   const res = await fetch(`${window.BASE_PATH}/api/files`);
   if (res.status === 401) {
@@ -203,6 +231,7 @@ async function loadMyFiles() {
       }
 
       if (res.ok) {
+        // Remove it from the page immediately rather than reloading the whole list.
         li.remove();
         myFilesEmpty.hidden = myFileListEl.children.length > 0;
       } else {
@@ -222,6 +251,8 @@ async function loadMyFiles() {
     myFileListEl.appendChild(li);
   });
 }
+
+// --- Drag & drop / paste / browse -----------------------------------------
 
 ['dragenter', 'dragover'].forEach((evt) =>
   dropzone.addEventListener(evt, (e) => {
@@ -245,13 +276,16 @@ browseBtn.addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', () => {
   if (fileInput.files.length) addFiles(fileInput.files);
-  fileInput.value = '';
+  fileInput.value = ''; // so picking the same file again still fires 'change'
 });
 
+// Anywhere-on-the-page paste, so users can Ctrl+V a copied file straight in.
 document.addEventListener('paste', (e) => {
   const files = e.clipboardData?.files;
   if (files?.length) addFiles(files);
 });
+
+// --- Upload ----------------------------------------------------------------
 
 uploadBtn.addEventListener('click', () => {
   if (!selectedFiles.length) return;
@@ -259,6 +293,7 @@ uploadBtn.addEventListener('click', () => {
   const formData = new FormData();
   selectedFiles.forEach((file) => formData.append('files', file, file.name));
 
+  // XMLHttpRequest (not fetch) so we can show real upload progress.
   const xhr = new XMLHttpRequest();
   xhr.open('POST', `${window.BASE_PATH}/api/upload`);
 
@@ -280,7 +315,7 @@ uploadBtn.addEventListener('click', () => {
       statusMsg.textContent = `Uploaded ${selectedFiles.length} file(s) successfully.`;
       selectedFiles = [];
       renderList();
-      loadMyFiles();
+      loadMyFiles(); // refresh "Your files" so the new upload(s) appear immediately
     } else if (xhr.status === 401) {
       window.location.href = `${window.BASE_PATH}/login`;
     } else {

@@ -1,4 +1,12 @@
 <!doctype html>
+<!--
+  Regular user's drop page. Served by server.js via renderPage('app.html'),
+  which does a plain string-replace of __BASE_PATH__ before sending this file
+  — that's why it appears in the stylesheet link and script tags below
+  instead of a templating engine. The share modal markup near the bottom is
+  intentionally duplicated (rather than shared/included) in admin.html; see
+  public/js/app.js for the drag/drop/upload/share logic.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">

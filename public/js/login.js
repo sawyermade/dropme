@@ -1,3 +1,10 @@
+// Client-side logic for the login page (views/login.html). Submits
+// credentials to /api/login and either redirects to / (which then sends
+// regular users to the drop page and admins to /admin) or shows the error.
+//
+// window.BASE_PATH is injected server-side (see renderPage in server.js) so
+// this still resolves correctly if the app is hosted under a path prefix.
+
 const form = document.getElementById('login-form');
 const errorEl = document.getElementById('login-error');
 

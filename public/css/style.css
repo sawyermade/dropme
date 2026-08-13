@@ -1,3 +1,9 @@
+/* Shared styles for all three pages (login, drop page, admin). One dark
+   theme via the custom properties below — swap these to re-skin the app.
+   Sections are grouped roughly in the order pages use them: base/login
+   styles first, then the drop page, then admin-only additions, then the
+   share modal (used by both the drop page and admin page). */
+
 :root {
   --bg: #12141a;
   --surface: #1b1e27;
