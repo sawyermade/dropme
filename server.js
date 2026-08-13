@@ -28,10 +28,15 @@ function saveUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
+// Usernames are never case-sensitive: always stored and looked up lowercase.
+function normalizeUsername(username) {
+  return typeof username === 'string' ? username.trim().toLowerCase() : username;
+}
+
 // Users predate the admin flag as plain "username": "bcryptHash" entries;
 // normalize both that shape and the newer { hash, isAdmin } shape here.
 function getUserRecord(users, username) {
-  const raw = users[username];
+  const raw = users[normalizeUsername(username)];
   if (!raw) return null;
   if (typeof raw === 'string') return { hash: raw, isAdmin: false };
   return { hash: raw.hash, isAdmin: !!raw.isAdmin };
@@ -141,13 +146,14 @@ router.post('/api/login', (req, res) => {
     return res.status(400).json({ error: 'Username and password required' });
   }
 
+  const normalized = normalizeUsername(username);
   const users = loadUsers();
-  const record = getUserRecord(users, username);
+  const record = getUserRecord(users, normalized);
   if (!record || !bcrypt.compareSync(password, record.hash)) {
     return res.status(401).json({ error: 'Invalid username or password' });
   }
 
-  req.session.user = username;
+  req.session.user = normalized;
   req.session.isAdmin = record.isAdmin;
   res.json({ ok: true });
 });
@@ -244,7 +250,8 @@ router.get('/api/admin/users', requireAuthApi, requireAdminApi, (req, res) => {
 });
 
 router.post('/api/admin/users', requireAuthApi, requireAdminApi, (req, res) => {
-  const { username, password, isAdmin } = req.body || {};
+  const { password, isAdmin } = req.body || {};
+  const username = normalizeUsername(req.body?.username);
 
   if (!username || !USERNAME_RE.test(username)) {
     return res.status(400).json({ error: 'Username may only contain letters, numbers, hyphens and underscores.' });
@@ -264,7 +271,7 @@ router.post('/api/admin/users', requireAuthApi, requireAdminApi, (req, res) => {
 });
 
 router.put('/api/admin/users/:username/password', requireAuthApi, requireAdminApi, (req, res) => {
-  const { username } = req.params;
+  const username = normalizeUsername(req.params.username);
   const { password } = req.body || {};
 
   if (!password) {
@@ -283,7 +290,7 @@ router.put('/api/admin/users/:username/password', requireAuthApi, requireAdminAp
 });
 
 router.delete('/api/admin/users/:username', requireAuthApi, requireAdminApi, (req, res) => {
-  const { username } = req.params;
+  const username = normalizeUsername(req.params.username);
 
   if (username === req.session.user) {
     return res.status(400).json({ error: 'You cannot delete your own account.' });

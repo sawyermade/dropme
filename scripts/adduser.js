@@ -18,7 +18,10 @@ function saveUsers(users) {
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-rl.question('Username: ', (username) => {
+rl.question('Username: ', (rawUsername) => {
+  // Usernames are never case-sensitive: always stored and looked up lowercase.
+  const username = rawUsername.trim().toLowerCase();
+
   if (!USERNAME_RE.test(username)) {
     console.error('Username may only contain letters, numbers, hyphens and underscores (it becomes the uploads/ subfolder name).');
     rl.close();
