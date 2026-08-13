@@ -73,6 +73,7 @@ web_modules/
 # App data
 uploads/
 users.json
+shares.json
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache

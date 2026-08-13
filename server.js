@@ -5,10 +5,12 @@ const session = require('express-session');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 
 const PORT = process.env.PORT || 3000;
 const USERS_FILE = path.join(__dirname, 'users.json');
+const SHARES_FILE = path.join(__dirname, 'shares.json');
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const USERNAME_RE = /^[a-zA-Z0-9_-]+$/;
 
@@ -40,6 +42,49 @@ function getUserRecord(users, username) {
   if (!raw) return null;
   if (typeof raw === 'string') return { hash: raw, isAdmin: false };
   return { hash: raw.hash, isAdmin: !!raw.isAdmin };
+}
+
+function loadShares() {
+  if (!fs.existsSync(SHARES_FILE)) return {};
+  return JSON.parse(fs.readFileSync(SHARES_FILE, 'utf8'));
+}
+
+function saveShares(shares) {
+  fs.writeFileSync(SHARES_FILE, JSON.stringify(shares, null, 2));
+}
+
+function findShareToken(shares, username, filename) {
+  return (
+    Object.keys(shares).find(
+      (token) => shares[token].username === username && shares[token].filename === filename
+    ) || null
+  );
+}
+
+// Returns the existing share token for this file, or mints and stores a new one.
+function getOrCreateShareToken(username, filename) {
+  const shares = loadShares();
+  const existing = findShareToken(shares, username, filename);
+  if (existing) return existing;
+
+  let token;
+  do {
+    token = crypto.randomBytes(24).toString('hex');
+  } while (shares[token]);
+
+  shares[token] = { username, filename };
+  saveShares(shares);
+  return token;
+}
+
+// Revokes any share for this file so its old public URL stops working.
+function revokeShare(username, filename) {
+  const shares = loadShares();
+  const token = findShareToken(shares, username, filename);
+  if (token) {
+    delete shares[token];
+    saveShares(shares);
+  }
 }
 
 // Injects BASE_PATH (and any extra __VAR__ placeholders) into the HTML shell
@@ -136,6 +181,20 @@ router.get('/admin', requireAuthPage, requireAdminPage, (req, res) => {
   res.type('html').send(renderPage('admin.html', { USERNAME: req.session.user }));
 });
 
+// Public, unauthenticated download via a share token — anyone with the link can hit this.
+router.get('/s/:token', (req, res) => {
+  const shares = loadShares();
+  const entry = shares[req.params.token];
+  if (!entry) return res.status(404).send('Not found');
+
+  const filePath = path.join(UPLOADS_DIR, entry.username, entry.filename);
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).send('Not found');
+  }
+
+  res.download(filePath, entry.filename);
+});
+
 router.get('/api/me', (req, res) => {
   res.json({ user: req.session.user || null, isAdmin: !!req.session.isAdmin });
 });
@@ -206,7 +265,37 @@ router.delete('/api/files/:filename', requireAuthApi, (req, res) => {
     return res.status(404).json({ error: 'Not found' });
   }
 
+  revokeShare(req.session.user, filename);
   fs.unlinkSync(filePath);
+  res.json({ ok: true });
+});
+
+router.get('/api/share/:filename', requireAuthApi, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, req.session.user, filename);
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  const token = findShareToken(loadShares(), req.session.user, filename);
+  res.json({ token });
+});
+
+router.post('/api/share/:filename', requireAuthApi, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, req.session.user, filename);
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  res.json({ token: getOrCreateShareToken(req.session.user, filename) });
+});
+
+router.delete('/api/share/:filename', requireAuthApi, (req, res) => {
+  const filename = path.basename(req.params.filename);
+  revokeShare(req.session.user, filename);
   res.json({ ok: true });
 });
 
@@ -237,7 +326,40 @@ router.delete('/api/admin/files/:username/:filename', requireAuthApi, requireAdm
     return res.status(404).json({ error: 'Not found' });
   }
 
+  revokeShare(username, filename);
   fs.unlinkSync(filePath);
+  res.json({ ok: true });
+});
+
+router.get('/api/admin/share/:username/:filename', requireAuthApi, requireAdminApi, (req, res) => {
+  const username = path.basename(req.params.username);
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, username, filename);
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  const token = findShareToken(loadShares(), username, filename);
+  res.json({ token });
+});
+
+router.post('/api/admin/share/:username/:filename', requireAuthApi, requireAdminApi, (req, res) => {
+  const username = path.basename(req.params.username);
+  const filename = path.basename(req.params.filename);
+  const filePath = path.join(UPLOADS_DIR, username, filename);
+
+  if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+
+  res.json({ token: getOrCreateShareToken(username, filename) });
+});
+
+router.delete('/api/admin/share/:username/:filename', requireAuthApi, requireAdminApi, (req, res) => {
+  const username = path.basename(req.params.username);
+  const filename = path.basename(req.params.filename);
+  revokeShare(username, filename);
   res.json({ ok: true });
 });
 

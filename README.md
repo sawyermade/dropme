@@ -174,6 +174,25 @@ pm2 restart dropme
 time. `.env`, `users.json`, and `uploads/` aren't touched by any of this — they
 live outside git entirely (see below).
 
+## Sharing files publicly
+
+Every file — on a user's own page or in the admin's Uploads listing — has a
+**Share** button next to Download and Delete. It opens a modal with an on/off
+toggle:
+
+- **On** generates a public link (`.../s/<random token>`) and shows it with a
+  copy-to-clipboard button. Anyone with that link can download the file —
+  **no login required**.
+- **Off** immediately invalidates that link; the same URL 404s afterward. It's
+  a strict on/off — there's no scheduled expiry, so a link stays live until
+  someone turns it back off.
+
+Deleting a file also revokes its share automatically, so a stale share link
+can never outlive the file it pointed to.
+
+Share tokens live in `shares.json` at the repo root — gitignored, like
+`users.json` and `uploads/`.
+
 ## Where files are stored
 
 Uploads land in `uploads/<username>/`, where `<username>` is whoever is logged
@@ -191,3 +210,4 @@ new server) you need to recreate them yourself using the steps above:
 - `.env` — `PORT`, `SESSION_SECRET`, and `BASE_PATH`
 - `users.json` — bcrypt-hashed login credentials
 - `uploads/` — everything anyone has uploaded
+- `shares.json` — active public share tokens (see "Sharing files publicly")

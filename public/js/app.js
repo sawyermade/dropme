@@ -12,6 +12,99 @@ const statusMsg = document.getElementById('status-msg');
 const myFileListEl = document.getElementById('my-file-list');
 const myFilesEmpty = document.getElementById('my-files-empty');
 
+const shareModal = document.getElementById('share-modal');
+const shareModalTitle = document.getElementById('share-modal-title');
+const shareModalClose = document.getElementById('share-modal-close');
+const shareToggle = document.getElementById('share-toggle');
+const shareUrlRow = document.getElementById('share-url-row');
+const shareUrlInput = document.getElementById('share-url-input');
+const shareCopyBtn = document.getElementById('share-copy-btn');
+const shareCopiedMsg = document.getElementById('share-copied-msg');
+
+let shareFilename = null;
+
+function buildShareUrl(token) {
+  return `${window.location.origin}${window.BASE_PATH}/s/${token}`;
+}
+
+function openShareModal(filename) {
+  shareFilename = filename;
+  shareModalTitle.textContent = `Share "${filename}"`;
+  shareUrlRow.hidden = true;
+  shareCopiedMsg.hidden = true;
+  shareToggle.checked = false;
+  shareToggle.disabled = true;
+  shareModal.hidden = false;
+
+  fetch(`${window.BASE_PATH}/api/share/${encodeURIComponent(filename)}`)
+    .then((res) => {
+      if (res.status === 401) {
+        window.location.href = `${window.BASE_PATH}/login`;
+        return null;
+      }
+      return res.json();
+    })
+    .then((data) => {
+      if (!data) return;
+      shareToggle.disabled = false;
+      shareToggle.checked = !!data.token;
+      if (data.token) {
+        shareUrlInput.value = buildShareUrl(data.token);
+        shareUrlRow.hidden = false;
+      }
+    });
+}
+
+function closeShareModal() {
+  shareModal.hidden = true;
+  shareFilename = null;
+}
+
+shareModalClose.addEventListener('click', closeShareModal);
+
+shareModal.addEventListener('click', (e) => {
+  if (e.target === shareModal) closeShareModal();
+});
+
+shareToggle.addEventListener('change', async () => {
+  if (!shareFilename) return;
+  shareToggle.disabled = true;
+  const url = `${window.BASE_PATH}/api/share/${encodeURIComponent(shareFilename)}`;
+
+  if (shareToggle.checked) {
+    const res = await fetch(url, { method: 'POST' });
+    if (res.status === 401) {
+      window.location.href = `${window.BASE_PATH}/login`;
+      return;
+    }
+    const { token } = await res.json();
+    shareUrlInput.value = buildShareUrl(token);
+    shareUrlRow.hidden = false;
+  } else {
+    await fetch(url, { method: 'DELETE' });
+    shareUrlRow.hidden = true;
+    shareUrlInput.value = '';
+    shareCopiedMsg.hidden = true;
+  }
+
+  shareToggle.disabled = false;
+});
+
+shareCopyBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(shareUrlInput.value);
+  } catch {
+    // Clipboard API can fail (permissions, focus state) — fall back to a manual-copy selection.
+    shareUrlInput.select();
+    document.execCommand('copy');
+  }
+
+  shareCopiedMsg.hidden = false;
+  setTimeout(() => {
+    shareCopiedMsg.hidden = true;
+  }, 1500);
+});
+
 function addFiles(fileList) {
   for (const file of fileList) {
     const alreadyAdded = selectedFiles.some(
@@ -87,6 +180,12 @@ async function loadMyFiles() {
     link.href = `${window.BASE_PATH}/api/download/${encodeURIComponent(file.name)}`;
     link.textContent = 'Download';
 
+    const shareBtn = document.createElement('button');
+    shareBtn.type = 'button';
+    shareBtn.className = 'share-btn';
+    shareBtn.textContent = 'Share';
+    shareBtn.addEventListener('click', () => openShareModal(file.name));
+
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'delete-file-btn';
@@ -115,6 +214,7 @@ async function loadMyFiles() {
     const actions = document.createElement('div');
     actions.className = 'file-actions';
     actions.appendChild(link);
+    actions.appendChild(shareBtn);
     actions.appendChild(deleteBtn);
 
     li.appendChild(nameSpan);

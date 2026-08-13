@@ -18,6 +18,93 @@ const progressWrap = document.getElementById('progress-wrap');
 const progressBar = document.getElementById('progress-bar');
 const statusMsg = document.getElementById('status-msg');
 
+const shareModal = document.getElementById('share-modal');
+const shareModalTitle = document.getElementById('share-modal-title');
+const shareModalClose = document.getElementById('share-modal-close');
+const shareToggle = document.getElementById('share-toggle');
+const shareUrlRow = document.getElementById('share-url-row');
+const shareUrlInput = document.getElementById('share-url-input');
+const shareCopyBtn = document.getElementById('share-copy-btn');
+const shareCopiedMsg = document.getElementById('share-copied-msg');
+
+let shareContext = null;
+
+function buildShareUrl(token) {
+  return `${window.location.origin}${window.BASE_PATH}/s/${token}`;
+}
+
+function shareApiUrl(username, filename) {
+  return `${window.BASE_PATH}/api/admin/share/${encodeURIComponent(username)}/${encodeURIComponent(filename)}`;
+}
+
+function openShareModal(username, filename) {
+  shareContext = { username, filename };
+  shareModalTitle.textContent = `Share "${filename}"`;
+  shareUrlRow.hidden = true;
+  shareCopiedMsg.hidden = true;
+  shareToggle.checked = false;
+  shareToggle.disabled = true;
+  shareModal.hidden = false;
+
+  fetch(shareApiUrl(username, filename)).then(async (res) => {
+    if (await handleAuthFailure(res)) return;
+    const data = await res.json();
+    shareToggle.disabled = false;
+    shareToggle.checked = !!data.token;
+    if (data.token) {
+      shareUrlInput.value = buildShareUrl(data.token);
+      shareUrlRow.hidden = false;
+    }
+  });
+}
+
+function closeShareModal() {
+  shareModal.hidden = true;
+  shareContext = null;
+}
+
+shareModalClose.addEventListener('click', closeShareModal);
+
+shareModal.addEventListener('click', (e) => {
+  if (e.target === shareModal) closeShareModal();
+});
+
+shareToggle.addEventListener('change', async () => {
+  if (!shareContext) return;
+  shareToggle.disabled = true;
+  const url = shareApiUrl(shareContext.username, shareContext.filename);
+
+  if (shareToggle.checked) {
+    const res = await fetch(url, { method: 'POST' });
+    if (await handleAuthFailure(res)) return;
+    const { token } = await res.json();
+    shareUrlInput.value = buildShareUrl(token);
+    shareUrlRow.hidden = false;
+  } else {
+    await fetch(url, { method: 'DELETE' });
+    shareUrlRow.hidden = true;
+    shareUrlInput.value = '';
+    shareCopiedMsg.hidden = true;
+  }
+
+  shareToggle.disabled = false;
+});
+
+shareCopyBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(shareUrlInput.value);
+  } catch {
+    // Clipboard API can fail (permissions, focus state) — fall back to a manual-copy selection.
+    shareUrlInput.select();
+    document.execCommand('copy');
+  }
+
+  shareCopiedMsg.hidden = false;
+  setTimeout(() => {
+    shareCopiedMsg.hidden = true;
+  }, 1500);
+});
+
 function formatSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   const units = ['KB', 'MB', 'GB', 'TB'];
@@ -194,6 +281,12 @@ async function loadUploads() {
       link.href = `${window.BASE_PATH}/api/admin/download/${encodeURIComponent(username)}/${encodeURIComponent(file.name)}`;
       link.textContent = 'Download';
 
+      const shareBtn = document.createElement('button');
+      shareBtn.type = 'button';
+      shareBtn.className = 'share-btn';
+      shareBtn.textContent = 'Share';
+      shareBtn.addEventListener('click', () => openShareModal(username, file.name));
+
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
       deleteBtn.className = 'delete-file-btn';
@@ -226,6 +319,7 @@ async function loadUploads() {
       const actions = document.createElement('div');
       actions.className = 'file-actions';
       actions.appendChild(link);
+      actions.appendChild(shareBtn);
       actions.appendChild(deleteBtn);
 
       li.appendChild(nameSpan);
