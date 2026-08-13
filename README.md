@@ -2,6 +2,16 @@
 
 A node js file uploader for ppl to drop you shit
 
+## Features
+
+- Login-gated drag & drop, paste, or browse-to-upload
+- Per-user upload folders, with a "Your files" list (download/share/delete)
+- Admin panel: manage users (add/delete/reset password), browse and manage
+  everyone's uploads
+- Public share links per file, toggleable on/off, revoked automatically on delete
+- Deployable at the domain root or under a path prefix (`BASE_PATH`)
+- Case-insensitive usernames (sometimes this needs to be stated)
+
 ## Requirements
 
 - Node.js 18+ and npm
