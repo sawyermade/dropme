@@ -1,6 +1,6 @@
 # DropMe
 
-A node js file uploader for ppl, and yourself, to drop you shit! Then share it.
+A node js file uploader for ppl, and yourself, to drop you stuff! Then share it.
 
 ## Features
 
